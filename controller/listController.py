@@ -38,10 +38,10 @@ class ProductsClass(Resource):
         try:
             args = parser.parse_args()
             page = args['page']         # 쿼리스트링으로 받은 페이지
-            if not 0 < int(page) <= 4:
+            if not 0 < int(page) <= 400:
                 abort(404, "We Can't find Page")
                 return
-            if(cache.get(str(page))):
+            if cache.get(str(page)):
                 return cache.get(str(page))
             else:
                 products, meta = views.get_product_all_list(page)

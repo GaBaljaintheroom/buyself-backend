@@ -1,0 +1,100 @@
+version: "3"
+services:
+  back:
+    build:
+      # context: ./buyself-backend
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+#    volumes:
+#      - ./buyself-backend/:/buyself-backend/
+    environment:
+      FLASK_ENV: development
+      FLASK_DEBUG: 1
+    networks:
+      - app-tier
+
+  rabbitmq:
+    hostname: rabbit    # 도커 컨테이너의 호스트 내임
+    image: rabbitmq:3-management  # 래빗엠큐 이미지 버전
+    command: rabbitmq-server     # 컨테이너 수행할 명령어
+    restart: unless-stopped      # 컨테이너 종료시 (재시작여부) 종료 코드와 상관없이 컨테이너가 다시시작하지만 서비스가 중지되거나 제거되면 다시 시작을 중지한다
+    environment:
+      - RABBITMQ_DEFAULT_USER=buyselfback   #rabbitmq 아이디
+      - RABBITMQ_DEFAULT_PASS=buyselfback #rabbitmq 비밀번호
+    ports:
+      - 5672:5672  #rabbitmq AMQP 기본 포트 번호
+      - 15672:15672 #Rabbitmq web
+    networks:
+      - app-tier
+    depends_on: #depends_on은 다른 서비스에 대한 의존관계를 나타냄, 컨테이너를 생성하는 순서나 연동 여부를 정의
+      - back
+
+  celery:
+    build:
+      # context: ./buyself-backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - "rabbitmq"
+      - "back"
+    networks:
+      - app-tier
+    command:
+      [
+        "celery",
+        "-A",
+        "tasks",
+        "worker",
+        "--loglevel=info",
+        "--pool",
+        "threads",
+      ]
+
+  redis:
+    image: redis:alpine                 # 경량화된 레디스 버전
+    command: redis-server --port 6379   #redis서버 오픈 명령어
+    ports:
+      - 6379:6379                       # 호스트 포트:컨테이너 포트
+    networks:
+        - app-tier
+
+  elasticsearch:
+    build:
+      context: ./elasticsearch
+      args:
+        ELASTIC_VERSION: 7.17.8
+    volumes:
+      - ./elasticsearch/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro,Z
+    ports:
+      - 9200:9200
+      - 9300:9300
+    environment:
+      node.name: elasticsearch
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+      ELASTIC_PASSWORD: buyself
+      discovery.type: single-node
+    restart: unless-stopped
+    networks:
+      - app-tier
+
+  influxdb:
+    image: bitnami/influxdb:1.8.5
+    container_name: influxdb
+    ports:
+      - "8086:8086"
+      - "8085:8088"
+    environment:
+      - INFLUXDB_ADMIN_USER_PASSWORD=bitnami123
+      - INFLUXDB_ADMIN_USER_TOKEN=admintoken123
+      - INFLUXDB_HTTP_AUTH_ENABLED=false
+      - INFLUXDB_DB=myk6db
+
+  grafana:
+    image: bitnami/grafana:latest
+    ports:
+      - "3000:3000"
+
+networks:
+  app-tier:
+    driver: bridge
