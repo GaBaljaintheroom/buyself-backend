@@ -41,11 +41,12 @@ def create_app():
         license="MIT",
     )
 
-    from controller import searchController,listController,predictController, paymentController
+    from controller import searchController,listController,predictController, paymentController, NoindexlistController
     api.add_namespace(searchController.Products, '/')
     api.add_namespace(listController.Products, '/')
     api.add_namespace(predictController.Products, '/')
     api.add_namespace(paymentController.Products, '/')
+    api.add_namespace(NoindexlistController.Products, '/')
 
     return app
 
