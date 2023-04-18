@@ -11,6 +11,9 @@ services:
     environment:
       FLASK_ENV: development
       FLASK_DEBUG: 1
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
     networks:
       - app-tier
 

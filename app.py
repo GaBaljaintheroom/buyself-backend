@@ -7,6 +7,8 @@ from prometheus_flask_exporter import PrometheusMetrics
 from config import DatabaseConfig
 import logging
 
+from controller.elasticSearch import inputData
+
 db = SQLAlchemy()
 migrate = Migrate()
 app = Flask(__name__)
@@ -40,6 +42,9 @@ def create_app():
         contact="junsu1222@naver.com",
         license="MIT",
     )
+
+    # ElasticSearch inputData
+    inputData()
 
     from controller import searchController,listController,predictController, paymentController, NoindexlistController
     api.add_namespace(searchController.Products, '/')

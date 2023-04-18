@@ -2,6 +2,7 @@ from elasticsearch import Elasticsearch
 import json
 import os
 
+
 def inputData():
     es = Elasticsearch("http://elasticsearch:9200/")
 
@@ -49,7 +50,7 @@ def inputData():
     filename = os.path.join(scriptpath, 'productData.json')
 
     with open(filename, 'r', encoding='utf-8') as file:
-        datas = json.load(file)     # 문자열을 객체로 변환
+        datas = json.load(file)  # 문자열을 객체로 변환
         body = ""
         for i in datas['products']:
             body = body + json.dumps({"index": {"_index": "dictionary"}}) + '\n'
