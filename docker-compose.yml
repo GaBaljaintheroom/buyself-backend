@@ -12,7 +12,13 @@ services:
       FLASK_ENV: development
       FLASK_DEBUG: 1
     depends_on:
-      - elasticsearch
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://elasticsearch:9200"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
     restart: unless-stopped
     networks:
       - app-tier
@@ -78,6 +84,11 @@ services:
       ELASTIC_PASSWORD: buyself
       discovery.type: single-node
     restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=1s" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
     networks:
       - app-tier
 
