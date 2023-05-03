@@ -31,7 +31,6 @@ class ProductsClass(Resource):
     @cache.cached(timeout=86400)
     def get(self):
         """전체 상품 리스트를 페이지 별로 가져옵니다. """
-        # inputData()                     # POST Elasticsearch input Data
         try:
             products = ProductsModel.query.all()
             result = [{'id': product.id,

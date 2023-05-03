@@ -1,11 +1,12 @@
 import http from 'k6/http';
-import { sleep, check } from 'k6';
+import {sleep, check} from 'k6';
 
 export const options = {
+  // Key configurations for spike in this section
   stages: [
-    { duration: '1m', target: 200 }, // simulate ramp-up of traffic from 1 to 100 users over 5 minutes.
-    { duration: '6m', target: 200 }, // stay at 100 users for 10 minutes
-    { duration: '1m', target: 0 }, // ramp-down to 0 users
+    { duration: '2m', target: 750 }, // fast ramp-up to a high point
+    // No plateau
+    { duration: '1m', target: 0 }, // quick ramp-down to 0 users
   ],
 };
 

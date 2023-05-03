@@ -1,11 +1,12 @@
 import http from 'k6/http';
-import { sleep, check } from 'k6';
+import {sleep, check} from 'k6';
 
 export const options = {
+  // Key configurations for Stress in this section
   stages: [
-    { duration: '1m', target: 200 }, // simulate ramp-up of traffic from 1 to 100 users over 5 minutes.
-    { duration: '6m', target: 200 }, // stay at 100 users for 10 minutes
-    { duration: '1m', target: 0 }, // ramp-down to 0 users
+    { duration: '5m', target: 400 }, // traffic ramp-up from 1 to a higher 200 users over 10 minutes.
+    { duration: '15m', target: 400 }, // stay at higher 200 users for 10 minutes
+    { duration: '2m30s', target: 0 }, // ramp-down to 0 users
   ],
 };
 
