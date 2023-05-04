@@ -4,18 +4,11 @@ from flask_restx import Resource, Namespace
 from flask_caching import Cache
 
 from app import app
+from controller.listController import cache
 from models.products import Products as ProductsModel
 
 db = SQLAlchemy()
 
-# Initialize Cache
-cache = Cache(app, config={
-    'CACHE_TYPE': 'redis',
-    'CACHE_REDIS_HOST': 'redis',
-    'CACHE_REDIS_PORT': '6379',
-    'CACHE_REDIS_DB': '0',
-    'CACHE_REDIS_URL': 'redis://redis:6379/0',
-})
 
 Products = Namespace(
     name="Products",

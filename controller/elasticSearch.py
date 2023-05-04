@@ -46,13 +46,17 @@ def inputData():
                 }
             }
         )
+
     scriptpath = os.path.dirname(__file__)
-    filename = os.path.join(scriptpath, 'productData.json')
+    filename = os.path.join(scriptpath, 'products.json')
 
     with open(filename, 'r', encoding='utf-8') as file:
-        datas = json.load(file)  # 문자열을 객체로 변환
-        body = ""
-        for i in datas['products']:
-            body = body + json.dumps({"index": {"_index": "dictionary"}}) + '\n'
-            body = body + json.dumps(i, ensure_ascii=False) + '\n'
-        es.bulk(body)
+        datas = json.load(file)
+        chunk_size = 1000  # chunk 크기 설정
+        chunks = [datas['products'][i:i+chunk_size] for i in range(0, len(datas['products']), chunk_size)]
+        for chunk in chunks:
+            body = ""
+            for i in chunk:
+                body = body + json.dumps({"index": {"_index": "dictionary"}}) + '\n'
+                body = body + json.dumps(i, ensure_ascii=False) + '\n'
+            es.bulk(body)

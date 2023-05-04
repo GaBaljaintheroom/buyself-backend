@@ -46,12 +46,13 @@ def create_app():
     # ElasticSearch inputData
     inputData()
 
-    from controller import searchController,listController,predictController, paymentController, NoindexlistController
+    from controller import searchController,listController,predictController, paymentController, NoindexlistController, searchLikeController
     api.add_namespace(searchController.Products, '/')
     api.add_namespace(listController.Products, '/')
     api.add_namespace(predictController.Products, '/')
     api.add_namespace(paymentController.Products, '/')
     api.add_namespace(NoindexlistController.Products, '/')
+    api.add_namespace(searchLikeController.Products, '/')
 
     return app
 
