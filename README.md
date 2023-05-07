@@ -1,314 +1,170 @@
-# buyself-backend
+- 다음은 전체 상품 조회를 cache를 통해 성능 개선한 기록입니다. 
+- 데이터베이스에는 50만 데이터가 있습니다.
+# 성능테스트를 하기 위해 K6를 적용한 이유
 
-# 상품 리스트 페이지에 cache적용과 k6를 이용한 성능테스트에 대한 기록
+1. 부하테스트 : k6은 애플리케이션에 대한 부하를 시뮬레이션하고 이를 통해 애플리케이션의 성능과 안정성을 평가할 수 있습니다.
+2. 확장성: k6은 클라우드 기반으로 구축되어 있으므로, 사용자 수가 증가함에 따라 애플리케이션의 성능을 테스트하는 데 적합합니다. (Vus 설정가능)
+3. 실시간 모니터링: k6은 실시간으로 애플리케이션의 성능을 모니터링하고 결과를 시각화하여 분석할 수 있습니다. (Influxdb 와 Gragfana로 시각화)
+4. 쉬운 사용: k6은 간단하고 직관적인 명령어를 제공하여 사용자가 쉽게 성능 테스트를 수행할 수 있습니다. ( Javascprit언어로 script파일 작성 )
 
-## 그런데 나는 대체 왜 전체 상품 리스트를 반환하는 Controller에 pagination과 cache를 적용할려 했을까?
 
-### pagination을 이용한 인덱스를 생성하면 뭐가 좋은가?
+# pagination을 왜 이용해야 하는 이유
 
-- 페이지 번호와 함께 인덱스를 사용하면, SQL 쿼리에서 LIMIT 및 OFFSET을 사용하여 현재 페이지에 표시되는 상품 데이터를 추출할 수 있습니다. 이를 통해 전체 상품 데이터를 모두 추출하지 않고도 현재 페이지의 상품 데이터만 추출할 수 있으므로, 데이터베이스의 부하를 줄이고 응답 시간을 단축할 수 있습니다.
-
-**pagination의 장점은?**
-
+- 페이지 번호와 함께 인덱스를 사용하면, SQL 쿼리에서 LIMIT 및 OFFSET을 사용하여 현재 페이지에 표시되는 상품 데이터를 추출할 수 있습니다. 이를 통해 전체 상품 데이터를 모두 추출하지 않고도 현재 페이지의 상품 데이터만 추출할 수 있으므로, 데이터베이스의 부하를 줄이고 Latency을 단축할 수 있습니다.
+- 여기서 인덱스는 id에 primarykey가 적용되어 자동으로 인덱스가 생성이 됩니다.
 - 페이지네이션 UI에서 사용자가 현재 어떤 페이지를 보고 있는지를 파악하기 쉬워집니다. 사용자가 명확하게 현재 페이지를 알면, 다음 페이지나 이전 페이지로 이동하기가 더 쉬워져서 사용자 경험을 개선할 수 있습니다.
 
 **결론**
 
-- 따라서, 전체 상품 데이터 리스트에 pagination을 이용한 인덱스를 사용하면, 데이터베이스의 부하를 줄이고 응답 시간을 단축 할 수 있으며, 사용자의 UX가 향상됩니다.
+- 따라서, 전체 상품 데이터 리스트에 pagination을 이용하면, **데이터베이스의 부하를 줄이고 응답 시간을 단축 할 수 있으며, 사용자의 UX가 향상됩니다.**
+- pagination을 적용한 후 한 페이지당 80개의 데이터를 반환하도록 했습니다.
 
-### 우리는 어떤 데이터를 캐싱해야할까?
+# Cache가 필요한 이유
+
+**어떤 데이터를 캐싱해야할까?** 
 
 - **업데이트가 자주 발생하지 않는 데이터**
-    - 잦은 업데이트가 발생하는 데이터를 캐싱한다면 업데이트가 발생할 때마다 DB의 데이터와 캐시 데이터의 정합성을 맞추는 작업을 실시해야 하기 때문에 오히려 성능에 악영향을 줄 수 있다.
+    - 잦은 업데이트가 발생하는 데이터를 캐싱한다면 업데이트가 발생할 때마다 DB의 데이터와 캐시 데이터의 정합성을 맞추는 작업을 실시해야 하기 때문에 오히려 성능에 악영향을 줄 수 있습니다.
 - **자주 조회되는 데이터를 사용한다.**
-    - 조회 요청이 거의 없는 데이터를 캐싱한다면 그저 메모리만 낭비하는 데이터가 될 수 있으며, 조회시에도 본 스토리지에 요청을 보내기 전 캐시에 데이터가 존재하는지 확인해야하는 작업을 거치기 때문에 오히려 조회 속도가 더 느려질 수 있다.
-    
-**결론**
+    - 조회 요청이 거의 없는 데이터를 캐싱한다면 그저 메모리만 낭비하는 데이터가 될 수 있으며, 조회시에도 본 스토리지에 요청을 보내기 전 캐시에 데이터가 존재하는지 확인해야하는 작업을 거치기 때문에 오히려 조회 속도가 더 느려질 수 있습니다.
 
-- *전체 상품 데이터를 반환하는 리스트는 사용자에게 자주 조회되는 데이터이고 업데이트가 상대적으로 자주 발생하지 않다고 판단되어 cache를 적용하는 것이 좋다고 생각되었다.*
+***전체 상품 데이터를 반환하는 리스트는 사용자에게 자주 조회되는 데이터이고 업데이트가 상대적으로 자주 발생하지 않다고 판단되어 cache를 적용하는 것이 좋다고 생각되었습니다.***
 
-
-|  | 데이터 수 | 캐시 적용 여부  | 인덱스 적용 여부 | postman 응답 시간 | 총 페이지 /한 페이지당 반환 개수 |
-| --- | --- | --- | --- | --- | --- |
-| 실험1 | 500,000 | X | X | 29.43s | 1/50만 |
-| 실험2 | 500,000 | O | X | 19.97s | 1/50만 |
-| 실험3 | 500,000 | X | O | 193ms | 400/80 |
-| 실험4 | 500,000 | O | O | 31ms | 400/80 |
-
-***표 해석***
-
-- pagination을 적용해도 데이터의 개수(50만)가 많다 보니 cache를 적용하지 않았을 때와 했을 때의 차이는 꽤 났다. (193ms → 31ms) 193ms가 적지 않은 시간이라고 생각할 수 있지만 193ms의 시간이 다른 데이터를 응답 받기 위한 이전의 응답시간이라면 사용자의 서비스 이용 시간에 대한 만족도는 그리 높지 않을 것이라고 생각했다.
-- 대용량의 데이터에  캐시와 인덱스 모두 적용하여  응답 시간을 개선 시킬 수 있었다.
-    - *29.43s → 19.97s → 193ms → 31ms*
-- 현재 서비스의 데이터는 23개뿐이라 pagination과 cache를 이용한 응답속도의 감소는 체감이 덜하다고 느꼈지만 50만 데이터같은 대용량을 넣어보고 cache와 pagination을 적용 전/후로 응답속도를 확인해보니 확실히 필요성을 느낄 수 있었다.
-
-# K6 부하테스트 
-방법 : brew install k6(k6설치) → k6 run script.js(실행)
-
-```jsx
-import http from 'k6/http';
-import { sleep } from 'k6';
-
-export const options = {
-  vus: 100,
-  duration: '30s',
-};
-
-export default function () {
-     let page = Math.floor(Math.random() * 400) + 1; //  1부터 400 사이의 랜덤 페이지 생성
-
-    http.get(`http://localhost:5000/api/products?page=${page}`);
-    sleep(1); // sleep while a second  /  sleep() 함수를 사용하여 API를 호출하는 각각의 요청을 1초씩 지연
-}
-```
-
-모든 실험에는 100명의 유저가 30초동안 상품리스트 페이지를 1~400page 혹은 1~5000page까지 랜덤으로 들어가게 하였으며 데이터의 개수는 50만 혹은 3만2천이다. pagination을 이용한 자동 인덱스 생성은 적용된 상태로, 캐시의 적용 전/후 성능 테스트를 시도해보았다.
-
-
-|  | 데이터 수 | 캐시 적용 여부  | 인덱스 적용 여부 | k6/http_req_duration | 총 페이지 /한 페이지당 반환 개수 |
-| --- | --- | --- | --- | --- | --- |
-| 실험1-1 | 500,000 | X | O | 10.87s | 5000/100 |
-| 실험1-2 | 500,000 | O | O | 10.8s | 5000/100 |
-| 실험2-1 | 500,000 | X | O | 4.13s | 400/80 |
-| 실험2-2 | 500,000 | O | O | 35.55ms | 400/80 |
-| 실험3-1 | 32,000 | X | O | 769.76ms | 400/80 |
-| 실험3-2 | 32,000 | O | O | 47.24ms | 400/80 |
-
-***표 해석***
-
-- 실험 1-1, 1-2를 봤을 때 random 한 총 페이지의 개수가 너무 많으면 캐시의 적중률이 너무 떨어져 캐시의 효과가 없다. **즉, 캐시의 적중률이 너무 낮은 데이터에는 캐시를 적용하는 의미가 없다.**
-- 실험2-1과 실험 3-1를 비교해봤을 때 데이터의 양만 50만개로 많아지면(캐시를 적용안 했을 때) http_req_duration의 값은 차이가 많이 놨다.  **769.76ms → 4.13s 따라서 데이터의 양이 많아질 수록 적절한 데이터에 캐시는 필수라고 생각했다.**
-- 데이터의 양이 많아지더라도 캐시의 적중률은 random이기에 실험2-2과 실험3-2은의 http_req_duraton은 차이가 났다.
-
-
-# 각 성능 테스트를 위해 다시 데이터를 3만 2천개로 남겨두기로 했다.
-
-데이터의 수가 50만에 총 페이지/한 페이지당 반환 개수를 5000/100으로 하면 캐시의 적중률이 낮아 성능 테스트를 하는 의미가 없다고 생각했고 50만 데이터여도 400/80으로 하면 모든 데이터를 사용자에게 응답 해줄 수 있는 것이 아니기에 의미가 없다 생각했다. 따라서 지금부터 각 성능테스트는 실험 3-2의 
-
-(데이터수 : 32,000 / 캐시 적용 여부 : O / 인덱스 적용 여부 : O / 총 페이지, 페이지당 반환 개수 : 400/80)스펙으로 하겠다.
-
-```bash
-create
-    definer = junsu1222@`%` procedure KeepTop32000()
-BEGIN
-    DELETE t1
-    FROM junsu_project_v2.products t1
-    LEFT JOIN (
-        SELECT id
-        FROM junsu_project_v2.products
-        ORDER BY id
-        LIMIT 32000
-    ) t2 ON t1.id = t2.id
-    WHERE t2.id IS NULL;
-END;
-```
-
-# K6 공식 홈페이지에 나와있는 Test Type으로 성능 테스트를 해보겠다.
-<img width="849" alt="1" src="https://user-images.githubusercontent.com/97604953/232984871-4ef7ed4d-71fe-4927-8510-74e44834e6ba.png">
-
-
+따라서 Latency가 0.5s 이하, 0.8s 이하 비율을 더 높이고자 각 Page번호를 cache key로 적용시켰습니다.
 
 ## Smoke Testing
 
-- 시스템이 문제 없이 최소한의 로드를 처리할 수 있는지 확인합니다.
+스크립트를 실행하여 스크립트가 제대로 작동하는지, 시스템이 최소한의 로드에서 작동하는지 확인하고 기본 성능 값을 수집합니다.
 
-```jsx
-import http from 'k6/http';
-import { check, sleep } from 'k6';
+다음 목표를 가지고 스모크 테스트를 실행하였습니다.
 
-export let options = {
-  vus: 1,
-  duration: '1m',
-
-  thresholds: {
-    http_req_duration: ['p(99)<1500'], // 99% of requests must complete below 1.5s
-  },
-};
-
-export default function () {
-  let page = Math.floor(Math.random() * 400) + 1;
-  let res = http.get(`http://localhost:5000/api/products?page=${page}`);
-  check(res, { 'status was 200': (r) => r.status === 200 });
-  sleep(1)
-}
-```
-
-사용자 한명이 1분동안 api 요청, http_req_duration의 99%가 1.5s 아래여야 한다.
-
-<img width="952" alt="2" src="https://user-images.githubusercontent.com/97604953/232984910-bdee1555-bbc7-4508-809f-5508431e2eab.png">
+- 테스트 스크립트에 오류가 없는지 확인
+- 최소한의 로드에서 시스템이 오류(성능 또는 시스템 관련)를 발생시키지 않는지 확인
+- 최소 부하에서 시스템 응답의 기본 성능 메트릭을 수집
+<img width="988" alt="a1" src="https://user-images.githubusercontent.com/97604953/236676727-f1c6b660-877e-4f0a-9263-e5cf6d27ed38.png">
 
 
 ## Load Testing
 
-- 동시 사용자 또는 초당 요청 측면에서 시스템 성능을 평가합니다.
+Load Test는 시스템이 일반적인 날(일반적인 부하)에 성능 목표를 충족하는지 이해하는 데 도움이 됩니다. *여기서 일반적인 날은 평균적인 수의 사용자가 동시에 애플리케이션에 액세스하여 정상적이고 평균적인 작업을 수행하는 시간을 의미합니다.*
 
-```jsx
-import http from 'k6/http';
-import { sleep, check } from 'k6';
+다음 목표를 가지고 로드 테스트를 실행하였습니다.
 
-export const options = {
-  stages: [
-    { duration: '5m', target: 100 }, // simulate ramp-up of traffic from 1 to 100 users over 5 minutes.
-    { duration: '10m', target: 100 }, // stay at 100 users for 10 minutes
-    { duration: '5m', target: 0 }, // ramp-down to 0 users
-  ],
-  thresholds: {
-    'http_req_duration': ['p(99)<1500'], // 99% of requests must complete below 1.5s
-  },
-};
-
-export default function () {
-  let page = Math.floor(Math.random() * 400) + 1;
-  let res = http.get(`http://localhost:5000/api/products?page=${page}`);
-  check(res, { 'status was 200': (r) => r.status === 200 });
-  sleep(1);
-}
-```
-
-5분동안 사용자가 점차적으로 100명으로 상승 → 10분동안 100명 유지 → 5분동안 0명으로 점차 감소
-
-<img width="929" alt="3" src="https://user-images.githubusercontent.com/97604953/232984947-a3ba1e4b-2a26-4f24-88ef-25e8cfad6bab.png">
-
-<img width="1654" alt="123" src="https://user-images.githubusercontent.com/97604953/232985476-565c8b02-46c2-4c8d-822f-994cb76d7132.png">
+- 일반적인 부하에서 시스템 성능을 평가
+- 램프 업 또는 완전 부하 기간 동안 초기 성능 저하 징후를 식별
+<img width="1719" alt="a2" src="https://user-images.githubusercontent.com/97604953/236676737-e8c870e1-4c0a-4819-8303-f416385faa5b.png">
 
 
 ## Stress Testing
 
-- 과부하 상태에서 시스템의 가용성과 안정성을 평가하는 것입니다 .
-    - 극한 조건에서 시스템이 작동하는 방식.
-    - 사용자 또는 처리량 측면에서 시스템의 최대 용량은 얼마입니까?
-    - 시스템의 한계점과 장애 모드는 무엇입니까?
-    - 스트레스 테스트가 끝난 후 수동 개입 없이 시스템이 복구되는지 여부.
+로드가 평소보다 무거울 때 시스템이 어떻게 작동하는지 평가합니다.
 
-```jsx
-import http from "k6/http";
-import { sleep } from "k6";
+스트레스 테스트는 사용량이 많은 조건에서 시스템의 안정성과 신뢰성을 확인합니다. 시스템은 처리 기한, 월급날, 출퇴근 시간, 근무 종료 및 고부하 이벤트를 생성하기 위해 결합될 수 있는 기타 많은 격리된 동작과 같은 비정상적인 순간에 평소보다 높은 작업 부하를 받을 수 있습니다.
+<img width="1685" alt="a3" src="https://user-images.githubusercontent.com/97604953/236676740-7b8838ee-bc52-46b8-b604-a7795408308a.png">
 
-export const options = {
-  scenarios: {
-    stress: {
-      executor: "ramping-arrival-rate",
-      preAllocatedVUs: 500,
-      timeUnit: "1s",
-      stages: [
-        { duration: "2m", target: 10 }, // below normal load
-        { duration: "5m", target: 10},
-        { duration: "2m", target: 20 }, // normal load
-        { duration: "5m", target: 20 },
-        { duration: "2m", target: 30 }, // around the breaking point
-        { duration: "5m", target: 30 },
-        { duration: "2m", target: 40 }, // beyond the breaking point
-        { duration: "5m", target: 40 },
-        { duration: "10m", target: 0 }, // scale down. Recovery stage.
-      ],
-    },
-  },
-};
 
-export default function () {
-  let page = Math.floor(Math.random() * 400) + 1;
-  const BASE_URL = `http://localhost:5000/api/products?page=${page}`
-  const responses = http.batch([
-    ["GET", `${BASE_URL}`],
-    ["GET", `${BASE_URL}`],
-    ["GET", `${BASE_URL}`],
-    ["GET", `${BASE_URL}`],
-  ]);
-}
+## Spike Testing
+
+시스템이 갑작스럽고 대량의 사용 급증에서 살아남고 성능을 발휘하는지 확인합니다. 이러한 이벤트의 예로는 티켓 판매(ComicCon, Taylor Swift), 제품 출시(PS5, 패션 의류), 판매 발표(슈퍼볼 광고), 처리 기한(세금 신고) 및 계절별 판매(블랙 프라이데이, 크리스마스, 세인트 발렌타인)가 있습니다.
+
+다음 목표를 가지고 스파이크 테스트를 실행하였습니다.
+
+- 갑작스러운 트래픽 급증 시 시스템이 어떻게 작동하는지 확인
+- 갑작스러운 부하 급증에서 살아남을지 여부를 확인
+- 트래픽이 감소한 후 시스템이 복구되는지 여부를 판단
+<img width="1715" alt="a4" src="https://user-images.githubusercontent.com/97604953/236676744-0daddb5f-d223-456d-b97e-b171cc32f8a4.png">
+
+
+## 정리
+
+- 데이터베이스에 50만 데이터를 넣고 상품 조회 API를 테스트 해보니 pagination은 필수임을 몸소 느낄 수 있었습니다.
+- Cache를 사용하기 전에는 응답 Latency가 0.5s 이하 비율은 2%, 0.8s 이하 비율은 3%, 1.2s 이상의 비율은 95%였지만 Cache를 사용하여 데이터베이스의 부하를 줄이고 응답 Latency가 0.5s 이하의 비율이 100%인 상태로 200명의 유저를 유지 할 수 있었습니다.
+- Stress Testing으로 응답 Latency가 http_req_failed 없이 0.5s 이하가 96%, 0.5s 초과 0.8s 이하가 2%, 1.2s 이상이 1%로 400명의 유저를 유지 할 수 있었습니다.
+- flask 프레임워크를 사용해 서버 구축 후 전체 상품 조회 API에 Spike Testing 수행하면 http_req_failed 0%가 나오면서 최대 수용할 수 있는 Vus는 750임을 확인 할 수 있었습니다.
+
+<hr>
+
+# 다음은 상품 검색 성능 테스트 기록입니다.
+
+## ilike연산자
+
+상품 데이터를 검색하기 위한 검색 API를 구현하기 위해 다음과 같이 ilike연산으로 조회를 하도록 했습니다.
+
+ilike 연산자는 like연산자와 달리 대소문자를 구분하지 않고 문자열을 비교하는 연산자입니다.
+
+```python
+search = '%%{}%%'.format(kw)
+pagination = Products.query.filter(Products.class_name.ilike(search))
+															.paginate(page=page, per_page=80, error_out=False)
 ```
-<img width="1120" alt="123" src="https://user-images.githubusercontent.com/97604953/232985672-7f50efe5-a175-40c7-9fd5-68929d0c50c9.png">
-<img width="1653" alt="1234" src="https://user-images.githubusercontent.com/97604953/232985683-9725cfc2-5323-40c0-a88d-cbec2080155b.png">
+
+## ilike연산자 + index
+
+검색의 조회 속도를 높이기 위해 상품명 컬럼에 index를 생성해 보았습니다. 
+
+상품명 컬럼은 insert / update / delete 가 상대적으로 자주 발생하지 않는 컬럼임으로 데이터베이스가 페이지 분할과 사용안함 표시로 인덱스의 조각화가 심해져 성능이 저하되는 일(데이터베이스 성능 이슈)이 잘 없다고 생각했습니다. 50만 데이터가 들어있는 규모가 작지 않은 테이블이라 인덱스의 성능을 볼 수 있을 것이라고 생각했습니다. 그러나 인덱스의 효과는 미미했습니다. 대부분 latency가 800ms로 측정되었습니다.
+
+## ilike연산자 + index + cache
+
+```python
+cache.get(str((kw, page)))
+```
+
+다음과 같이 검색어와 page 번호를 cache의 키 값으로 설정하여 latency를 줄이고자 했습니다. (이때 page의 default값은 1입니다.)
+캐시에 데이터가 없을 때(첫 요청)는 latency가 800ms가 나왔지만 캐시 메모리에 저장되니 응답 latency의 속도는 18ms로 굉장히 빨랐습니다.
+
+**문제 발견**
+
+- 랜덤 숫자를 검색어와 페이지에 둘다 적용하니 캐시의 적중률 너무 낮아 캐시의 이용률이 너무 적어 응답시간이 너무 느렸고 오류가 발생하기도 했습니다.
+- 캐시의 hit가 너무 낮으면 캐시를 제대로 사용하지 못하며, 캐시 메모리에 있지 않는 데이터는 응답 latency가 너무 늦다는 단점이 있었습니다. ilike 연산자에 인덱스를 적용시켜도 성능개선은 미미하여 근본적인 데이터베이스의 조회 속도는 그리 좋다고 할 수 없었습니다.
+
+# elasticsearch 검색엔진을 사용하게된 이유
+
+- 관계형 데이터베이스는 단순 텍스트매칭에 대한 검색만을 제공합니다.
+- 상품검색시 MySQL에 LIKE ‘%단어%’ 검색시 완벽한 전문 검색(Full Text Search)은 지원하지 않습니다
+    - 하지만 엘라스틱서치는 분석기를 통한 역인덱싱 으로 이것을 완벽하게 지원합니다. 물론 요즘 MySQL 최신 버전에서 n-gram 기반의 Full-text 검색을 지원하지만, 한글 검색의 경우에 아직 많이 빈약한 감이 있습니다.
+- 텍스트를 여러 단어로 변형하거나 텍스트의 특징을 이용한 동의어나 유의어를 활용한 검색이 가능합니다.
+- 엘라스틱서치에서는 형태소 분석을 통한 자연어 처리가 가능합니다.
+    - 엘라스틱서치는 다양한 형태소 분석 플러그인을 제공합니다.
+- 엘라스틱서치에서는 관계형 데이터베이스에서 불가능한 비정형 데이터의 색인과 검색이 가능합니다.
+    - 이러한 특성은 빅데이터 처리에서 매우 중요하게 생각되는 부분입니다.
+- 역색인 지원으로 매우 빠른 검색이 가능합니다.
+    - 검색 조건으로 Cache Key를 등록하는데 검색조건이 다양하여 Cache 성능이 떨어집니다.
+
+```python
+scriptpath = os.path.dirname(__file__)
+filename = os.path.join(scriptpath, 'products.json')
+
+with open(filename, 'r', encoding='utf-8') as file:
+        datas = json.load(file)
+        chunk_size = 1000  # chunk 크기 설정
+        chunks = [datas['products'][i:i+chunk_size] for i in range(0, len(datas['products']), chunk_size)]
+        for chunk in chunks:
+            body = ""
+            for i in chunk:
+                body = body + json.dumps({"index": {"_index": "dictionary"}}) + '\n'
+                body = body + json.dumps(i, ensure_ascii=False) + '\n'
+            es.bulk(body)
+```
+
+products.json에 50만 데이터를 elasticsearch에 한번에 bulk연산하는 것은 굉장한 시간이 걸렸습니다. 따라서 1000개씩 데이터를 나누어서 색인 작업을 하니 50초 이내에 더미 데이터를 삽입할 수 있었습니다. elasticsearch로 검색엔진을 바꾸고 load Test와 Stress Test를 진행할 때 Vus를 100명씩 증가하여 안정성을 확보하고 싶었습니다.
+
+## Smoke Testing
+<img width="953" alt="b1" src="https://user-images.githubusercontent.com/97604953/236677352-31a8ae21-3248-4bd7-9615-5d60ed7cf03d.png">
+
+## Load Testing
+<img width="1709" alt="b2" src="https://user-images.githubusercontent.com/97604953/236677358-90fb58de-778f-4b69-a65f-e6f66eed3c44.png">
+
+## Stress Testing
+<img width="1716" alt="b3" src="https://user-images.githubusercontent.com/97604953/236677372-96097438-75ef-43d5-b38f-a0842d8657a1.png">
+
+## Spike Testing
+<img width="1713" alt="b4" src="https://user-images.githubusercontent.com/97604953/236677388-a0e45572-6cce-4b51-a315-417fae84debf.png">
 
 
+**정리**
 
-http_req_failed가 0.06%가 나왔다. 적은 수치라 생각하지만 0.00%가 되기 위해서는 서버 측의 리소스를 늘리거나 스케일 업/아웃 등의 조치로 해결 할 수도 있겠다 생각했다.
-
-- 스케일 업은 서버 자체의 하드웨어 성능을 높이는 방법입니다. 이는 일반적으로 프로세서, 메모리, 디스크 용량 등을 추가하거나 업그레이드하는 것을 의미합니다. 이 방법은 단일 서버로 동작하는 경우에 적합합니다.
-- 스케일 아웃은 서버를 여러 대 추가하여 작업을 분산하는 방법입니다. 즉, 여러 대의 서버가 네트워크를 통해 일을 분담하도록 하는 것입니다. 이 방법은 여러 대의 서버가 필요하거나 고가용성 및 수평 확장성이 필요한 경우에 적합합니다.
-
-**내가 선택한 방식은 코드 리펙토링이다.**
-
-상품 검색 API를 설계할 때 Full Text Search로 구현하기위해 elasticsearch를 이용하였다. 이때 elasticsearch에 더미 데이터를 넣는 inputData()함수를 전체 상품 조회 API앞에 넣어놨었다. 이유는 첫 검색 Request를 보내면 inputData()가 실행이 안되고 2번째 Request를 보내야 inputData()가 실행되어 알맞은 데이터의 응답을 확인할 수 있었다. 첫 요청을 보넬때 더미 데이터가 다 안들어가진 상태에서 응답을 보네주어서 그런것 같았다. 따라서 inputData()를 첫 상품 리스트 페이지 요청과 함께 실행되도록 넣어 놓았는데 이러면 상품 페이지를 두 번째 Request 할때마다 inputData()를 호출하여 의미없는 함수 요청을 계속하게 되었다. inputData()를 애플리케이션 시작할 때 한번만 호출하도록 바꾸었다.
-
-## Stress Testing-2
-
-<img width="1009" alt="123" src="https://user-images.githubusercontent.com/97604953/232985806-c21742b6-05a2-45ee-b8b0-0167891a253b.png">
-
-<img width="1666" alt="1234" src="https://user-images.githubusercontent.com/97604953/232985822-41548056-3484-4c45-ac7b-1f789d5d47dc.png">
-
-<img width="1636" alt="12345" src="https://user-images.githubusercontent.com/97604953/232985831-1098f994-5a7f-4e97-a11c-7aaa0d8b6801.png">
-
-
-의미 없는 함수의 호출을 계속 반복하지 않고 애플리케이션 시작할 때 한번만 하게 리펙토링 한 것만으로도 Stress Testing을 잘 수행 할 수 있었다.
-
-## Spike Test
-
-- 극심한 부하 급증으로 시스템을 즉시 압도하는 일종의 스트레스 테스트입니다.
-    - 갑작스러운 트래픽 급증 시 시스템이 어떻게 작동하는지.
-    - 트래픽이 감소한 후 시스템이 복구되는지 여부를 판단
-    
-    ```jsx
-    import http from "k6/http";
-    import { check } from 'k6';
-    
-    export const options = {
-      scenarios: {
-        spike: {
-          executor: "ramping-arrival-rate",
-          preAllocatedVUs: 1000,
-          timeUnit: "1s",
-          stages: [
-            { duration: "10s", target: 10 }, // below normal load
-            { duration: "1m", target: 10 },
-            { duration: "10s", target: 100 }, // spike to 140 iterations
-            { duration: "3m", target: 100 }, // stay at 140 for 3 minutes
-            { duration: "10s", target: 10 }, // scale down. Recovery stage.
-            { duration: "3m", target: 10 },
-            { duration: "10s", target: 0 },
-          ],
-          gracefulStop: "2m",
-        },
-      },
-    };
-    
-    export default function () {
-      let page = Math.floor(Math.random() * 400) + 1;
-      const BASE_URL = `http://localhost:5000/api/products?page=${page}`
-      const responses = http.batch([
-        ["GET", `${BASE_URL}`, null],
-        ["GET", `${BASE_URL}`, null],
-        ["GET", `${BASE_URL}`, null],
-        ["GET", `${BASE_URL}`, null],
-      ]);
-    
-      check(responses[0], {
-        'status is 200': (res) => res.status === 200,
-      });
-    }
-    ```
-   
-<img width="946" alt="9" src="https://user-images.githubusercontent.com/97604953/232985928-500e241e-45c5-4650-9318-864b62b8a0fe.png">
-
-<img width="1671" alt="10" src="https://user-images.githubusercontent.com/97604953/232985981-9285e31b-e58d-4f07-9f11-1b8f50867029.png">
-
-<img width="997" alt="11" src="https://user-images.githubusercontent.com/97604953/232985972-f9ec1986-3e9f-4e9d-84b2-e09cc98c07f2.png">
-
-## Soak Testing
-
-- 오랜 기간 동안 시스템에 압력이 가해져 발생하는 성능 및 안정성 문제를 밝혀냅니다.
-
-일반적으로 이 테스트를 실행하여 다음을 수행합니다.
-
-- 몇 시간 동안 작동한 후 시스템이 충돌하거나 다시 시작되는 버그나 메모리 누수가 시스템에 없는지 확인하십시오.
-- 예상되는 애플리케이션 재시작이 요청을 잃지 않는지 확인합니다.
-- 산발적으로 나타나는 경쟁 조건과 관련된 버그를 찾으십시오.
-- 데이터베이스가 할당된 저장 공간을 소진하지 않고 중지하는지 확인하십시오.
-- 로그가 할당된 디스크 스토리지를 소진하지 않는지 확인하십시오.
-- 특정 양의 요청이 실행된 후에 의존하는 외부 서비스가 작동을 중지하지 않는지 확인하십시오.
-
-큰 부하를 가지는 soak testing을 수행해야 한다면, 서버와 같은 고성능 컴퓨터를 사용하는 것이 좋다. 내 맥북 pro로는 이 Testing을 제대로 수행하지 못하는것 같다.
-
-1. 리소스 제한: 맥북 Pro는 서버와 달리 제한된 리소스를 가지고 있습니다. 따라서 큰 부하를 가지는 soak testing을 실행하면 맥북 Pro의 CPU, 메모리 및 디스크 리소스가 고갈되어 정확한 결과를 얻을 수 없습니다.
-2. 네트워크 제한: 맥북 Pro는 서버와 달리 일반적으로 더 낮은 대역폭을 가지고 있습니다. 따라서 네트워크 부하 테스트를 실행하는 경우, 테스트 대상이 맥북 Pro와 같은 로컬 머신인 경우 더 큰 제한이 있을 수 있습니다.
-3. 전력 제한: 맥북 Pro는 배터리로 동작하는 노트북이므로, 성능 테스트를 실행하는 경우 전력 소모가 높아질 수 있습니다. 이는 맥북 Pro의 배터리 수명과 성능에 영향을 미칠 수 있습니다.
-
+- Elasticsearch로 검색엔진을 구축을 하면 cache의 적중률에 따라 천차만별인 응답속도와 달리 역색인 지원으로 항상 빠른 응답을 지원했습니다.
+    - **Load Testing** (ilike + index + cache 적용시) 200Vus, latency 1.2s 이상 rate : 89%, http_req_failed :  51.76% → (elasticsearch적용시) 300 Vus,  latency 1.2s 이상 rate : 0%, http_req_failed : 0%, 0.5s이하 rate : 97%, 0.8s 이하 rate : 99%로 성능 개선
+    - **Stress Testing** (ilike + index + cache 적용시) 400Vus, max http_req_duration : 7.32s,  latency 0.5s 이하 rate : 97% → (elasticsarch 적용시) 500Vus, max http_req_duration : 1.57s, latency 0.5s 이하 rate : 99%로 성능 개선
+- Elasticsearch는 형태소 분석을 통한 자연어 처리가 가능하고 동의어나 유의어를 활용한 검색이 가능하므로 사용자의 검색 응답 질을 높일 수 있습니다.
