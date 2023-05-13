@@ -18,7 +18,14 @@ def inputData():
                             "analyzer": {
                                 "nori_token": {
                                     "type": "custom",
-                                    "tokenizer": "nori_tokenizer"
+                                    "tokenizer": "nori_tokenizer",
+                                    "filter": ["my_synonyms"]
+                                }
+                            },
+                            "filter": {
+                                "my_synonyms": {
+                                    "type": "synonym",
+                                    "synonyms_path": "synonym.txt"
                                 }
                             }
                         }
@@ -48,7 +55,7 @@ def inputData():
         )
 
     scriptpath = os.path.dirname(__file__)
-    filename = os.path.join(scriptpath, 'products.json')
+    filename = os.path.join(scriptpath, 'productData.json')
 
     with open(filename, 'r', encoding='utf-8') as file:
         datas = json.load(file)

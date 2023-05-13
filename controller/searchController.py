@@ -39,13 +39,32 @@ class ProductsClass(Resource):
         # 검색 쿼리를 생성합니다.
         search_body = {
             "query": {
-                "match": {
-                    "class_name": str(kw)
+                "bool": {
+                    "must": [
+                        {
+                            "match": {
+                                "class_name": {
+                                    "query": str(kw),
+                                    "analyzer": "nori_token"
+                                }
+                            }
+                        }
+                    ]
                 }
             },
             "from": (page - 1) * size,
             "size": size
         }
+
+        # search_body = {
+        #     "query": {
+        #         "term": {
+        #             "class_name": str(kw)
+        #         }
+        #     },
+        #     "from": (page - 1) * size,
+        #     "size": size
+        # }
 
         # Elasticsearch에서 결과를 검색합니다.
         product_results = es.search(index='dictionary', body=search_body)

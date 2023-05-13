@@ -153,6 +153,41 @@
       "price": 2080,
       "img_url": "https://buyself.s3.ap-northeast-2.amazonaws.com/allProductImage/%ED%81%AC%EB%9D%BC%EC%9A%B4)%EB%A7%88%EC%9D%B4%EC%AE%B8%ED%8F%AC%EB%8F%84110G.jpg",
       "analyze": "크라운)마이쮸 포도"
+    },
+    {
+      "id": 23,
+      "class_name": "허쉬)허쉬드링크",
+      "price": 1500,
+      "img_url": "허쉬드링크 이미지",
+      "analyze": "허쉬)허쉬드링크"
+    },
+    {
+      "id": 24,
+      "class_name": "롯데)빠삐꼬",
+      "price": 1000,
+      "img_url": "빠삐고 아이스크림 이미지",
+      "analyze": "롯데)빠삐꼬"
+    },
+    {
+      "id": 25,
+      "class_name": "롯데)마이구미 젤리",
+      "price": 1000,
+      "img_url": "마이구미 젤리 이미지",
+      "analyze": "롯데)마이구미 젤리"
+    },
+    {
+      "id": 26,
+      "class_name": "농심)jelly jelly",
+      "price": 1000,
+      "img_url": "jelly jelly 이미지",
+      "analyze": "농심)jelly jelly"
+    },
+    {
+      "id": 27,
+      "class_name": "푸딩",
+      "price": 1000,
+      "img_url": "푸딩 이미지",
+      "analyze": "푸딩"
     }
   ]
 }
