@@ -10,9 +10,16 @@
 
 # pagination을 왜 이용해야 하는 이유
 
-- 페이지 번호와 함께 인덱스를 사용하면, SQL 쿼리에서 LIMIT 및 OFFSET을 사용하여 현재 페이지에 표시되는 상품 데이터를 추출할 수 있습니다. 이를 통해 전체 상품 데이터를 모두 추출하지 않고도 현재 페이지의 상품 데이터만 추출할 수 있으므로, 데이터베이스의 부하를 줄이고 Latency을 단축할 수 있습니다.
-- 여기서 인덱스는 id에 primarykey가 적용되어 자동으로 인덱스가 생성이 됩니다.
+- SQL 쿼리에서 LIMIT 및 OFFSET을 사용하여 현재 페이지에 표시되는 상품 데이터를 추출할 수 있습니다. 이를 통해 전체 상품 데이터를 모두 추출하지 않고도 현재 페이지의 상품 데이터만 추출할 수 있으므로, 데이터베이스의 부하를 줄이고 Latency을 단축할 수 있습니다.
 - 페이지네이션 UI에서 사용자가 현재 어떤 페이지를 보고 있는지를 파악하기 쉬워집니다. 사용자가 명확하게 현재 페이지를 알면, 다음 페이지나 이전 페이지로 이동하기가 더 쉬워져서 사용자 경험을 개선할 수 있습니다.
+- 그러나 페이지네이션만 적용했을 때는 쿼리가 Table Full Scan을 하므로 코드를 개선하여 type이 range인 쿼리를 생성하는것이 좋습니다.
+```
+start_id = (page - 1) * 80 + 1
+    end_id = page * 80
+    pagination = Products.query.filter(Products.id.between(start_id, end_id))
+    						   .order_by(Products.id.asc())
+    						   .paginate(page=page, per_page=80, error_out=False)
+```
 
 **결론**
 
