@@ -175,3 +175,6 @@ products.json에 50만 데이터를 elasticsearch에 한번에 bulk연산하는 
     - **Load Testing** (ilike + index + cache 적용시) 200Vus, latency 1.2s 이상 rate : 89%, http_req_failed :  51.76% → (elasticsearch적용시) 300 Vus,  latency 1.2s 이상 rate : 0%, http_req_failed : 0%, 0.5s이하 rate : 97%, 0.8s 이하 rate : 99%로 성능 개선
     - **Stress Testing** (ilike + index + cache 적용시) 400Vus, max http_req_duration : 7.32s,  latency 0.5s 이하 rate : 97% → (elasticsarch 적용시) 500Vus, max http_req_duration : 1.57s, latency 0.5s 이하 rate : 99%로 성능 개선
 - Elasticsearch는 형태소 분석을 통한 자연어 처리가 가능하고 동의어나 유의어를 활용한 검색이 가능하므로 사용자의 검색 응답 질을 높일 수 있습니다.
+
+**기술 블로그**
+- [성능 기록일지](https://velog.io/@junsu1222/series/%EC%84%B1%EB%8A%A5%ED%85%8C%EC%8A%A4%ED%8A%B8)
